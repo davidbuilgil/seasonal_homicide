@@ -13,7 +13,7 @@ rainfall3 <- read.csv(here("data/col-rainfall-adm2-part3.csv"))
 rainfall <- rainfall1 %>%
   rbind(rainfall2, rainfall3)
 
-rm(rainfall1, rainfall2, rainfall3)
+# rm(rainfall1, rainfall2, rainfall3)
 
 # Find month and year in date
 rainfall <- rainfall %>%
@@ -35,7 +35,7 @@ rainfall_monthly_mean <- rainfall_month %>%
 
 # Step 2: Identify deviation from the mean and direction
 rainfall_month <- rainfall_month %>%
-  left_join(monthly_mean, by = "month") %>%
+  left_join(rainfall_monthly_mean, by = "month") %>%     # TO: changing 'monthly_mean' for 'rainfall_monthly_mean'
   mutate(
     deviation = rfh - mean_rfh,  # Deviation size
     above_below_avg = ifelse(deviation > 0, "Above", "Below")
@@ -54,6 +54,62 @@ rainfall_plot <- ggplot(rainfall_month, aes(x = year, y = deviation)) +
   ) +
   theme_minimal()
 rainfall_plot
+
+###########################
+
+## THIAGO: For step 1 above, maybe we should use data since 1981 instead of 
+#          since 2003? The goal, if I understood correctly, is simply to check
+#          how each monthly rfh deviates from the overall mean for that month.
+#          For that, calculating the overall mean since 1981 is better, I think
+# Doing that below:
+
+# Find month and year in date SINCE 1981
+rainfall_since1981 <- rainfall %>%
+  mutate(year = year(date),
+         month = month(date))
+
+# Aggregate data monthly
+rainfall_month_since1981 <- rainfall_since1981 %>%
+  group_by(month, year) %>%
+  summarise(rfh = sum(rfh)) %>%
+  mutate(month_name = factor(month.name[month], levels = month.name))
+
+# Calculate monthly mean and deviantion from monthly mean across years
+# Step 1: Calculate mean rfh for each month across years
+rainfall_monthly_mean_since1981 <- rainfall_month_since1981 %>%
+  group_by(month) %>%
+  summarise(mean_rfh_since1981 = mean(rfh, na.rm = TRUE))
+
+# Step 2: Identify deviation from the mean and direction
+rainfall_month_new <- rainfall_month %>%
+  # now we can keep the 2003-2025 dataset
+  left_join(rainfall_monthly_mean_since1981, by = "month") %>%     
+  # but comparing them against the 1981-2025 mean
+  mutate(
+    deviation_1981 = rfh - mean_rfh_since1981,  # Deviation size
+    above_below_avg_1981 = ifelse(deviation_1981 > 0, "Above", "Below")
+  )
+
+# check correlation between the to deviation measures
+rainfall_month_new %>% ungroup %>% dplyr::select(deviation, deviation_1981) %>% cor()
+# r = 0.98, so no difference
+
+# Plot facets by month
+rainfall_plot_81 <- ggplot(rainfall_month_new, aes(x = year, y = deviation_1981)) +
+  geom_line(color = "steelblue", alpha = 0.6) +  # Original data
+  geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 1) +  # LOESS trend line
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Reference line at zero
+  facet_wrap(~month_name, ncol = 4) +  # 12 facets (3 rows x 4 columns)
+  labs(
+    title = "Deviation from Monthly Mean RFH by Year",
+    x = "Year",
+    y = "Deviation"
+  ) +
+  theme_minimal()
+rainfall_plot_81
+
+
+###########################
 
 # Load homicide data
 homicide <- read.csv(here("data/HOMICIDIO_20250312.csv"))
@@ -102,11 +158,14 @@ homicide_plot
 
 # Plot two graphs together
 ggarrange(rainfall_plot, homicide_plot)
+ 
+# alternatively:
+ggarrange(rainfall_plot_81, homicide_plot)
 
 
 
 
-
+lm(deviation_homicide ~ deviation_rainfall, joint) %>% summary
 
 
 ###### IGNORE FROM HERE
