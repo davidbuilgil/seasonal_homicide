@@ -18,7 +18,7 @@ rainfall3 <- read.csv(here("data/col-rainfall-adm2-part3.csv"))
 rainfall <- rainfall1 %>%
   rbind(rainfall2, rainfall3)
 
-# rm(rainfall1, rainfall2, rainfall3)
+rm(rainfall1, rainfall2, rainfall3)
 
 # Find month and year in date
 rainfall <- rainfall %>%
@@ -215,16 +215,69 @@ merged_muni_data <- merged_muni_data %>%
          scaled_homicide_deviation = scale(homicide_deviation)[, 1])
 
 # Fixed Effects Model
-fe_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation, 
+fe_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation + factor(COD_MUNI), 
                      data = merged_muni_data %>% filter(year != 2025), 
-                     index = c("COD_MUNI", "time"), 
+                     index = c("year", "month"), 
                      model = "within")
 
 summary(fe_dept_model)
 
+###with interaction term (* instead of +): so each municipality has its own slope
+###right now the coefficients show how much municipalities contribute towards change in homicide
+
+fe_int_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation * factor(COD_MUNI), 
+                     data = merged_muni_data %>% filter(year != 2025), 
+                     index = c("year", "month"), 
+                     model = "within")
+
+summary(fe_int_dept_model)
+
+saveRDS(fe_int_dept_model, here("output/fe_int_dept_model.rds"))
+
+fe_int_dept_model <- readRDS("fe_int_dept_model.rds")
+
+summary(fe_int_dept_model)
 
 
 
+
+library(sf)
+library(spdep)
+
+# Load shapefile data
+shapefile_data <- st_read(here("data/Municipios_USAID/Municipios_USAID.shp"))
+
+# Check CRS
+st_crs(shapefile_data)
+
+# Select only variables of interest and extract centroids from polygons
+shapefile_data <- shapefile_data %>%
+  mutate(COD_MUNI = as.integer(MPIO_CCDGO)) %>%
+  dplyr::select(COD_MUNI, MPIO_CNMBR) %>%
+  mutate(LONG = st_coordinates(st_centroid(geometry))[, 1],
+         LAT = st_coordinates(st_centroid(geometry))[, 2])
+
+# Join with rainfall and homicide data
+merged_muni_data <- merged_muni_data %>%
+  full_join(shapefile_data, by = "COD_MUNI")
+
+
+
+
+
+
+# Create spatial weights matrix from sf object
+nb <- poly2nb(shapefile_data)
+W <- nb2listw(nb, style = "W", zero.policy = TRUE)
+
+# Fixed Effects Model
+fe_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation,
+                     data = merged_muni_data %>% filter(year != 2025),
+                     index = c("COD_MUNI", "time"),
+                     model = "within")
+
+# Test for spatial autocorrelation
+moran.test(resid(fe_dept_model), W)
 
 
 
