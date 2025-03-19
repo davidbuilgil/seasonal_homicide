@@ -134,98 +134,112 @@ gls_model <- gls(scaled_homicide_deviation ~ scaled_rainfall_deviation,
                  data = merged_data %>% filter(year != 2025))
 summary(gls_model)
 
-# Rename municipality codes
+# Rename municipality and department codes
 rainfall <- rainfall %>%
   mutate(COD_DEPTO = substr(gsub("^CO", "", ADM2_PCODE), 1, 2) %>%
-           gsub("^0", "", .))
+           gsub("^0", "", .),
+         COD_DEPTO = as.integer(COD_DEPTO),
+         COD_MUNI = gsub("^0", "", gsub("^CO", "", ADM2_PCODE)),
+         COD_MUNI = as.integer(COD_MUNI))
 
-# Create lookup table of departments
-depts <- homicide %>%
-  dplyr::select(COD_DEPTO, DEPARTAMENTO) %>%
-  unique() %>%
-  mutate(COD_DEPTO = as.character(COD_DEPTO))
-
-# Add department names to rainfall database
-rainfall <- rainfall %>%
-  left_join(depts, by = "COD_DEPTO")
-
-# Aggregate rainfall data by department and monthly
-rainfall_dept_month <- rainfall %>%
-  group_by(month, year, DEPARTAMENTO) %>%
+# Aggregate rainfall data by municipality and monthly
+rainfall_muni_month <- rainfall %>%
+  group_by(month, year, COD_MUNI) %>%
   summarise(rfh = sum(rfh)) %>%
   mutate(month_name = factor(month.name[month], levels = month.name))
 
-# Calculate monthly mean and deviantion from department and monthly mean across years
+# Calculate monthly mean and deviantion from municipality and monthly mean across years
 # Step 1: Calculate mean rfh for each month across years
-rainfall_dept_monthly_mean <- rainfall_dept_month %>%
-  group_by(month, DEPARTAMENTO) %>%
+rainfall_muni_monthly_mean <- rainfall_muni_month %>%
+  group_by(month, COD_MUNI) %>%
   summarise(mean_rfh = mean(rfh, na.rm = TRUE))
 
 # Step 2: Identify deviation from the mean and direction
-rainfall_dept_month <- rainfall_dept_month %>%
-  left_join(rainfall_dept_monthly_mean, by = c("month", "DEPARTAMENTO")) %>%
+rainfall_muni_month <- rainfall_muni_month %>%
+  left_join(rainfall_muni_monthly_mean, by = c("month", "COD_MUNI")) %>%
   mutate(
     deviation = rfh - mean_rfh,  # Deviation size
     above_below_avg = ifelse(deviation > 0, "Above", "Below")
   )
 
-# Aggregate homicide data by departments and monthly
-homicide_dept_month <- homicide %>%
-  group_by(year, month, DEPARTAMENTO) %>%
-  summarise(homicide = sum(CANTIDAD, na.rm = TRUE)) %>%
-  mutate(month_name = factor(month.name[month], levels = month.name))
+# Aggregate homicide data by municipality and monthly
+homicide_muni_month <- homicide %>%
+  group_by(year, month, COD_MUNI) %>%
+  summarise(homicide = sum(CANTIDAD, na.rm = TRUE))
+
+# List of months, years and municipalities from rainfall data
+muni_month <- rainfall_muni_month %>%
+  dplyr::select(month, year, COD_MUNI) %>%
+  filter(year >= 2003)
+
+# Left join homicide aggregates to list of months, years and municipalities
+# Assume 0 (NA) if is no homicide recorded
+homicide_muni_month <- muni_month %>%
+  left_join(homicide_muni_month, by = c("month", "year", "COD_MUNI")) %>%
+  mutate(homicide = ifelse(is.na(homicide), 0, homicide),
+         month_name = factor(month.name[month], levels = month.name))
 
 # Standardize homicide counts within each year
-homicide_dept_month <- homicide_dept_month %>%
+homicide_muni_month <- homicide_muni_month %>%
   group_by(year) %>%
   mutate(standardized_homicide = scale(homicide)[, 1]) %>%
   ungroup()
 
-# Calculate department and monthly mean (after standardization)
-homicide_dept_monthly_mean <- homicide_dept_month %>%
-  group_by(month, DEPARTAMENTO) %>%
+# Calculate municipality and monthly mean (after standardization)
+homicide_muni_monthly_mean <- homicide_muni_month %>%
+  group_by(month, COD_MUNI) %>%
   summarise(mean_standardized_homicide = mean(standardized_homicide, na.rm = TRUE))
 
-# Calculate deviation from mean for each department and month
-homicide_dept_month <- homicide_dept_month %>%
-  left_join(homicide_dept_monthly_mean, by = c("month", "DEPARTAMENTO")) %>%
+# Calculate deviation from mean for each municipality and month
+homicide_muni_month <- homicide_muni_month %>%
+  left_join(homicide_muni_monthly_mean, by = c("month", "COD_MUNI")) %>%
   mutate(deviation = standardized_homicide - mean_standardized_homicide)
 
-# Merge rainfall and homicide department data
-merged_dept_data <- rainfall_dept_month %>%
-  inner_join(homicide_dept_month, by = c("year", "month", "DEPARTAMENTO")) %>%
-  select(year, month, DEPARTAMENTO, deviation.x, deviation.y) %>%
+# Merge rainfall and homicide municipality data
+merged_muni_data <- rainfall_muni_month %>%
+  inner_join(homicide_muni_month, by = c("year", "month", "COD_MUNI")) %>%
+  select(year, month, COD_MUNI, deviation.x, deviation.y) %>%
   rename(rainfall_deviation = deviation.x,
          homicide_deviation = deviation.y)
 
+# Create new 'time' variable
+merged_muni_data <- merged_muni_data %>%
+  ungroup() %>%
+  mutate(date = as.Date(paste(year, month, "01", sep = "-"))) %>%
+  arrange(date) %>%
+  mutate(time = dense_rank(date))
+
 # Rescale all variables of interest
-merged_dept_data <- merged_dept_data %>%
+merged_muni_data <- merged_muni_data %>%
   mutate(scaled_rainfall_deviation = scale(rainfall_deviation)[, 1],
          scaled_homicide_deviation = scale(homicide_deviation)[, 1])
 
 # Fixed Effects Model
 fe_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation, 
-                data = merged_dept_data %>% filter(year != 2025), 
-                index = c("DEPARTAMENTO", "year", "month"), 
-                model = "within")
+                     data = merged_muni_data %>% filter(year != 2025), 
+                     index = c("COD_MUNI", "time"), 
+                     model = "within")
 
 summary(fe_dept_model)
 
-# Within-Between Model
-merged_dept_data <- merged_dept_data %>%
-  group_by(DEPARTAMENTO) %>%
-  mutate(
-    rainfall_within = scaled_rainfall_deviation - mean(scaled_rainfall_deviation, na.rm = TRUE),
-    rainfall_between = mean(scaled_rainfall_deviation, na.rm = TRUE)
-  ) %>%
-  ungroup()
 
-wb_dept_model <- plm(scaled_homicide_deviation ~ rainfall_within + rainfall_between, 
-                data = merged_dept_data %>% filter(year != 2025), 
-                index = c("DEPARTAMENTO", "year", "month"), 
-                model = "random")
 
-summary(wb_dept_model)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
