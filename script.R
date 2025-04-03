@@ -134,6 +134,14 @@ fe_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation,
 
 summary(fe_model)
 
+## checking
+fe_model_2 <- lm(scaled_homicide_deviation ~ scaled_rainfall_deviation + factor(year) + factor(month), 
+                data = merged_data %>% filter(year != 2025))
+
+summary(fe_model_2)
+
+## beta = -0.176146 | exactly the same model, as expected. all good.
+
 # GLS Model with Autocorrelation
 gls_model <- gls(scaled_homicide_deviation ~ scaled_rainfall_deviation, 
                  correlation = corAR1(form = ~ year | month), 
@@ -242,11 +250,40 @@ fe_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation + fac
 summary(fe_dept_model)
 ##coefficients show how much municipalities contribute towards change in homicide
 
+### TO: double checking
+fe_dept_model_2 <- lm(scaled_homicide_deviation ~ scaled_rainfall_deviation + factor(COD_MUNI) + factor(year) + factor(month), 
+                     data = merged_muni_data %>% filter(year != 2025))
+
+library(texreg)
+screenreg(fe_dept_model_2, digits = 7, omit.coef = "factor\\(.*\\)|gender|race|education")
+
+# beta = -0.0031341 | p = 0.098
+# beta = -0.0029468 | p = 0.122
+
+## don't know why they're not exactly the same, but any differences are negligent anyway
+
+fe_dept_model_3 <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation, 
+                     data = merged_muni_data %>% filter(year != 2025), 
+                     index = c("year", "month", "COD_MUNI"), 
+                     model = "within")
+summary(fe_dept_model_3)
+
+# beta = -0.0031048 | p = 0.099
+
 # Fixed Effects Model with interaction term (so each municipality has its own slope)
 fe_int_dept_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation * factor(COD_MUNI), 
                      data = merged_muni_data %>% filter(year != 2025), 
                      index = c("year", "month"), 
                      model = "within")
+
+library(lme4)
+lme_int_dept_model <- lmer(scaled_homicide_deviation ~ scaled_rainfall_deviation + 
+                             (scaled_rainfall_deviation | COD_MUNI) + factor(month) + factor(year),
+                           data = merged_muni_data %>% filter(year != 2025))
+
+summary(lme_int_dept_model)
+
+# consistent results again!
 
 #saveRDS(fe_int_dept_model, here("output/fe_int_dept_model.rds"))
 #fe_int_dept_model <- readRDS(here("output/fe_int_dept_model.rds"))
