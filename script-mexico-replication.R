@@ -174,7 +174,7 @@ homicide_plot
 
 # Plot two graphs together
 ggarrange(rainfall_plot, homicide_plot)
-#ggsave(here('output/deviations_by_year.jpg'), width = 10, height = 5)
+ggsave(here('output/deviations_by_year_mexico.jpg'), width = 10, height = 5)
 
 # Merge rainfall and homicide data
 merged_data <- rainfall_month %>%
@@ -195,20 +195,42 @@ fe_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation,
                 model = "within")
 
 summary(fe_model)
+summary(fe_model)$coefficients["scaled_rainfall_deviation", "Estimate"]
+summary(fe_model)$coefficients["scaled_rainfall_deviation", "Estimate"] + c(-2, 2) * summary(fe_model)$coefficients["scaled_rainfall_deviation", "Std. Error"]
 
-## checking
-fe_model_2 <- lm(scaled_homicide_deviation ~ scaled_rainfall_deviation + factor(year) + factor(month), 
-                data = merged_data %>% filter(year != 2025))
+# Check fixed effects model
+fe_model_check <- lm(scaled_homicide_deviation ~ scaled_rainfall_deviation + factor(year) + factor(month), 
+                     data = merged_data %>% filter(year != 2025))
 
-summary(fe_model_2)
-
-## beta = -0.176146 | exactly the same model, as expected. all good.
+summary(fe_model_check)
+summary(fe_model_check)$coefficients["scaled_rainfall_deviation", "Estimate"]
+summary(fe_model_check)$coefficients["scaled_rainfall_deviation", "Estimate"] + c(-2, 2) * summary(fe_model_check)$coefficients["scaled_rainfall_deviation", "Std. Error"]
 
 # GLS Model with Autocorrelation
 gls_model <- gls(scaled_homicide_deviation ~ scaled_rainfall_deviation, 
                  correlation = corAR1(form = ~ year | month), 
                  data = merged_data %>% filter(year != 2025))
-summary(gls_model)
+
+gls_model_ar2 <- gls(
+  scaled_homicide_deviation ~ scaled_rainfall_deviation,
+  correlation = corARMA(p = 2, form = ~ year | month),
+  data = merged_data %>% filter(year != 2025)
+)
+
+gls_model_ar3 <- gls(
+  scaled_homicide_deviation ~ scaled_rainfall_deviation,
+  correlation = corARMA(p = 3, form = ~ year | month),
+  data = merged_data %>% filter(year != 2025)
+)
+
+summary(gls_model)$tTable["scaled_rainfall_deviation", "Value"]
+summary(gls_model)$tTable["scaled_rainfall_deviation", "Value"] + c(-2, 2) * summary(gls_model)$tTable["scaled_rainfall_deviation", "Std.Error"]
+
+summary(gls_model_ar2)$tTable["scaled_rainfall_deviation", "Value"]
+summary(gls_model_ar2)$tTable["scaled_rainfall_deviation", "Value"] + c(-2, 2) * summary(gls_model_ar2)$tTable["scaled_rainfall_deviation", "Std.Error"]
+
+summary(gls_model_ar3)$tTable["scaled_rainfall_deviation", "Value"]
+summary(gls_model_ar3)$tTable["scaled_rainfall_deviation", "Value"] + c(-2, 2) * summary(gls_model_ar3)$tTable["scaled_rainfall_deviation", "Std.Error"]
 
 # Rename state codes
 state_lookup <- tibble::tribble(
@@ -449,30 +471,27 @@ fe_state_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation + fa
                      index = c("year", "month"), 
                      model = "within")
 
-summary(fe_state_model)
-##coefficients show how much states contribute towards change in homicide
+summary(fe_state_model) # coefficients show how much municipalities contribute towards change in homicide
+summary(fe_state_model)$coefficients["scaled_rainfall_deviation", "Estimate"]
+summary(fe_state_model)$coefficients["scaled_rainfall_deviation", "Estimate"] + c(-2, 2) * summary(fe_state_model)$coefficients["scaled_rainfall_deviation", "Std. Error"]
 
-### TO: double checking
+# Checking model
 fe_state_model_2 <- lm(scaled_homicide_deviation ~ scaled_rainfall_deviation + factor(ENTIDAD) + factor(year) + factor(month), 
                      data = merged_state_data %>% filter(year != 2025))
 
 summary(fe_state_model_2)
-
-library(texreg)
-screenreg(fe_state_model_2, digits = 7, omit.coef = "factor\\(.*\\)|gender|race|education")
-
-# beta = -0.0031341 | p = 0.098
-# beta = -0.0029468 | p = 0.122
-
-## don't know why they're not exactly the same, but any differences are negligent anyway
+summary(fe_state_model_2)$coefficients["scaled_rainfall_deviation", "Estimate"]
+summary(fe_state_model_2)$coefficients["scaled_rainfall_deviation", "Estimate"] + c(-2, 2) * summary(fe_state_model_2)$coefficients["scaled_rainfall_deviation", "Std. Error"]
 
 fe_state_model_3 <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation, 
                      data = merged_state_data %>% filter(year != 2025), 
                      index = c("year", "month", "ENTIDAD"), 
                      model = "within")
-summary(fe_state_model_3)
 
-# beta = -0.0031048 | p = 0.099
+summary(fe_state_model_3)
+summary(fe_state_model_3)$coefficients["scaled_rainfall_deviation", "Estimate"]
+summary(fe_state_model_3)$coefficients["scaled_rainfall_deviation", "Estimate"] + c(-2, 2) * summary(fe_state_model_3)$coefficients["scaled_rainfall_deviation", "Std. Error"]
+
 
 # Fixed Effects Model with interaction term (so each state has its own slope)
 fe_int_state_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation * factor(ENTIDAD), 
@@ -482,213 +501,76 @@ fe_int_state_model <- plm(scaled_homicide_deviation ~ scaled_rainfall_deviation 
 
 summary(fe_int_state_model)
 
-library(lme4)
-lme_int_state_model <- lmer(scaled_homicide_deviation ~ scaled_rainfall_deviation + 
-                             (scaled_rainfall_deviation | ENTIDAD) + factor(month) + factor(year),
-                           data = merged_state_data %>% filter(year != 2025))
-
-summary(lme_int_state_model)
-
-# consistent results again!
-
-######## CONTINUE FROM HERE
-
-
-
-
-
-#saveRDS(fe_int_dept_model, here("output/fe_int_dept_model.rds"))
-#fe_int_dept_model <- readRDS(here("output/fe_int_dept_model.rds"))
-#summary(fe_int_dept_model)
-
 # Extract coefficients table
-#coeff_fe_int_table <- as.data.frame(coef(summary(fe_int_dept_model)))
+coeff_fe_int_table <- as.data.frame(coef(summary(fe_int_state_model)))
 
-# Filter for COD_MUNI interaction terms only
-#coeff_fe_int_table <- coeff_fe_int_table[grep("scaled_rainfall_deviation:factor\\(COD_MUNI\\)", rownames(coeff_fe_int_table)), ]
+# Filter for ENTIDAD interaction terms only
+coeff_fe_int_table <- coeff_fe_int_table[grep("scaled_rainfall_deviation:factor\\(ENTIDAD\\)", rownames(coeff_fe_int_table)), ]
 
-# COD_MUNI identifiers
-#coeff_fe_int_table$COD_MUNI <- gsub("scaled_rainfall_deviation:factor\\(COD_MUNI\\)", "", rownames(coeff_fe_int_table))
-#coeff_fe_int_table <- coeff_fe_int_table %>%
-#  mutate(COD_MUNI = as.integer(COD_MUNI))
-
-#write.csv(coeff_fe_int_table, here("output/coeff_fe_int_table.csv"))
-coeff_fe_int_table <- read.csv(here("output/coeff_fe_int_table.csv"))
+# ENTIDAD identifiers
+coeff_fe_int_table$ENTIDAD <- gsub("scaled_rainfall_deviation:factor\\(ENTIDAD\\)", "", rownames(coeff_fe_int_table))
 
 # Load shapefile data
-shapefile_data <- st_read(here("data/Municipios_USAID/Municipios_USAID.shp"))
+shapefile_data <- st_read(here("data/mexico-replication/mex_admbnda_adm1_govmex_20210618.shp"))
 
-# Check CRS
-#st_crs(shapefile_data)
+# Rename states
+state_lookup3 <- tibble::tribble(
+  ~ENTIDAD, ~state,
+  "Aguascalientes", "AGUASCALIENTES",
+  "Baja California", "BAJA CALIFORNIA",
+  "Baja California Sur", "BAJA CALIFORNIA SUR",
+  "Campeche", "CAMPECHE",
+  "Coahuila de Zaragoza", "COAHUILA DE ZARAGOZA",
+  "Colima", "COLIMA",
+  "Chiapas", "CHIAPAS",
+  "Chihuahua", "CHIHUAHUA",
+  "Distrito Federal", "CIUDAD DE MEXICO",
+  "Durango", "DURANGO",
+  "Guanajuato", "GUANAJUATO",
+  "Guerrero", "GUERRERO",
+  "Hidalgo", "HIDALGO",
+  "Jalisco", "JALISCO",
+  "Mexico", "MEXICO",
+  "Michoacan de Ocampo", "MICHOACAN",
+  "Morelos", "MORELOS",
+  "Nayarit", "NAYARIT",
+  "Nuevo Leon", "NUEVO LEON",
+  "Oaxaca", "OAXACA",
+  "Puebla", "PUEBLA",
+  "Queretaro de Arteaga", "QUERETARO",
+  "Quintana Roo", "QUINTANA ROO",
+  "San Luis Potosi", "SAN LUIS POTOSI",
+  "Sinaloa", "SINALOA",
+  "Sonora", "SONORA",
+  "Tabasco", "TABASCO",
+  "Tamaulipas", "TAMAULIPAS",
+  "Tlaxcala", "TLAXCALA",
+  "Veracruz de Ignacio de la Llave", "VERACRUZ",
+  "Yucatan", "YUCATAN",
+  "Zacatecas", "ZACATECAS"
+)
 
-# Aggregate polygons by DPTO_CCDGO
-#department_polygons <- shapefile_data %>%
-#  group_by(DPTO_CCDGO) %>%
-#  summarise(geometry = st_union(geometry)) %>%
-#  ungroup()
-
-# Optional: Save the new shapefile
-#st_write(department_polygons, here("data/departamentos/Departamento_Polygons.shp"))
-
-# Load departments shapefile data
-department_polygons <- st_read(here("data/departamentos/Departamento_Polygons.shp"))
-
-# Calculate monthly mean and deviantion from department and monthly mean across years
-# Step 1: Calculate mean rfh for each month across years
-rainfall_dep_monthly_mean <- rainfall_dep_month %>%
-  group_by(month, COD_DEPTO) %>%
-  summarise(mean_rfh = mean(rfh, na.rm = TRUE))
-
-# Step 2: Identify deviation from the mean and direction
-rainfall_dep_month <- rainfall_dep_month %>%
-  left_join(rainfall_dep_monthly_mean, by = c("month", "COD_DEPTO")) %>%
-  mutate(
-    deviation = rfh - mean_rfh,  # Deviation size
-    above_below_avg = ifelse(deviation > 0, "Above", "Below")
-  )
-
-# List of months, years and departments from rainfall data
-dep_month <- rainfall_dep_month %>%
-  dplyr::select(month, year, COD_DEPTO) %>%
-  filter(year >= 2003)
-
-# Left join homicide aggregates to list of months, years and departments
-# Assume 0 (NA) if is no homicide recorded
-homicide_dep_month <- dep_month %>%
-  left_join(homicide_dep_month, by = c("month", "year", "COD_DEPTO")) %>%
-  mutate(homicide = ifelse(is.na(homicide), 0, homicide),
-         month_name = factor(month.name[month], levels = month.name))
-
-# Standardize homicide counts within each year
-homicide_dep_month <- homicide_dep_month %>%
-  group_by(year) %>%
-  mutate(standardized_homicide = scale(homicide)[, 1]) %>%
-  ungroup()
-
-# Calculate department and monthly homicide mean (after standardization)
-homicide_dep_monthly_mean <- homicide_dep_month %>%
-  group_by(month, COD_DEPTO) %>%
-  summarise(mean_standardized_homicide = mean(standardized_homicide, na.rm = TRUE))
-
-# Calculate homicide deviation from mean for each department and month
-homicide_dep_month <- homicide_dep_month %>%
-  left_join(homicide_dep_monthly_mean, by = c("month", "COD_DEPTO")) %>%
-  mutate(deviation = standardized_homicide - mean_standardized_homicide)
-
-# Merge rainfall and homicide department data
-merged_dep_data <- rainfall_dep_month %>%
-  inner_join(homicide_dep_month, by = c("year", "month", "COD_DEPTO")) %>%
-  select(year, month, COD_DEPTO, rfh, mean_rfh, deviation.x, 
-         standardized_homicide, mean_standardized_homicide, deviation.y) %>%
-  rename(rainfall_deviation = deviation.x,
-         homicide_deviation = deviation.y)
-
-# Calculate mean rainfall and homicide deviations for last 3 years (random number of years for visualization)
-merged_dep_data_3y <- merged_dep_data %>%
-  filter(year >= 2022 & year < 2025) %>%
-  group_by(COD_DEPTO, month) %>%
-  summarise(
-    mean_rainfall_deviation = mean(rainfall_deviation, na.rm = TRUE),
-    mean_rainfall = mean(rfh, na.rm = TRUE),
-    monthly_mean_rainfall_all = mean(mean_rfh, na.rm = TRUE),
-    mean_homicide_deviation = mean(homicide_deviation, na.rm = TRUE),
-    mean_homicide = mean(standardized_homicide, na.rm = TRUE),
-    monthly_mean_homicide_all = mean(mean_standardized_homicide, na.rm = TRUE)
-  )
-
-# Convert DPTO_CCDGO to integer, removing leading zeros
-department_polygons$COD_DEPTO <- as.integer(department_polygons$DPTO_CCDGO)
-
-# Merge shapefile with 3-year mean rainfall and homicide data
-merged_dep_data_3y <- merged_dep_data_3y %>%
-  full_join(department_polygons, by = "COD_DEPTO") %>%
-  mutate(month_name = factor(month.name[month], levels = month.name))
-
-# Reassign the sf class after join
-merged_dep_data_3y <- st_as_sf(merged_dep_data_3y, crs = st_crs(department_polygons))
-
-# Plot 3 year average homicide deviation by department
-homicide_map_dep <- ggplot(data = merged_dep_data_3y) +
-  geom_sf(aes(fill = mean_homicide_deviation), colour = NA) +
-  scale_fill_gradient2(
-    low = "darkblue",    # Colour for negative values
-    mid = "lightgrey",     # Neutral (zero) point
-    high = "darkred",   # Colour for positive values
-    midpoint = 0,      # Ensures zero is the neutral point
-    #limits = c(-2, 2),
-    na.value = "white",
-    guide = guide_colourbar(title = NULL),
-    labels = scales::number_format(accuracy = 0.1)
-  ) +
-  facet_wrap(~month_name, ncol = 4) +
-  labs(
-    title = "Mean Homicide Deviation (2022-2024)",
-    fill = ""
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text = element_blank(),
-    axis.title = element_blank(),
-    panel.grid = element_blank(),
-    strip.text = element_text(size = 10, face = "bold"),
-    legend.position = "bottom"
-  )
-
-# At municipal level, select only variables of interest and extract centroids from polygons
 shapefile_data <- shapefile_data %>%
-  mutate(COD_MUNI = as.integer(MPIO_CCDGO)) %>%
-  dplyr::select(COD_MUNI, MPIO_CNMBR) %>%
-  mutate(LONG = st_coordinates(st_centroid(geometry))[, 1],
-         LAT = st_coordinates(st_centroid(geometry))[, 2])
+  mutate(ADM1_ES = ifelse(!is.na(ADM1_REF), ADM1_REF, ADM1_ES)) %>%
+  left_join(state_lookup3, by = c("ADM1_ES" = "ENTIDAD")) %>%
+  rename(ENTIDAD = state)
 
-# Calculate mean rainfall and homicide deviatios for last 3 years (random number of years for visualization)
-merged_muni_data_3y <- merged_muni_data %>%
-  filter(year >= 2022 & year < 2025) %>%
-  group_by(COD_MUNI, month) %>%
-  summarise(
-    mean_rainfall_deviation = mean(rainfall_deviation, na.rm = TRUE),
-    mean_rainfall = mean(rfh, na.rm = TRUE),
-    monthly_mean_rainfall_all = mean(mean_rfh, na.rm = TRUE),
-    mean_homicide_deviation = mean(homicide_deviation, na.rm = TRUE),
-    mean_homicide = mean(standardized_homicide, na.rm = TRUE),
-    monthly_mean_homicide_all = mean(mean_standardized_homicide, na.rm = TRUE)
-  )
-
-# Removing datasets from environment
-rm(fe_int_dept_model, homicide, homicide_month, homicide_monthly_mean,
-   homicide_muni_month, homicide_muni_monthly_mean, merged_data, muni_month,
-   rainfall, rainfall_month, rainfall_muni_month, rainfall_muni_monthly_mean,
-   rainfall_plot, rainfall_monthly_mean)
-   
-# Merge shapefile with 5-year mean rainfall and homicide data
-merged_muni_data_3y <- merged_muni_data_3y %>%
-  full_join(shapefile_data, by = "COD_MUNI")
-
-# Also link coefficients from fixed effect model
-merged_muni_data_3y <- merged_muni_data_3y %>%
-  left_join(coeff_fe_int_table, by = "COD_MUNI") %>%
-  mutate(month_name = factor(month.name[month], levels = month.name)) %>%
-  dplyr::select(-X) %>%
-  filter(!is.na(month))
-
-# Reassign the sf class after join
-merged_muni_data_3y <- st_as_sf(merged_muni_data_3y, crs = st_crs(shapefile_data))
-
-# New data to plot regression estimates
-merged_muni_data_slopes <- merged_muni_data_3y %>%
-  dplyr::select(COD_MUNI, MPIO_CNMBR, geometry, Estimate, Std..Error,
-                Pr...t..) %>%
-  unique()
+# Left join estimates
+shapefile_data <- shapefile_data %>%
+  left_join(coeff_fe_int_table, by = "ENTIDAD")
 
 # Plot regression estimates
-estimates_map <- ggplot(data = merged_muni_data_slopes) +
-  geom_sf(aes(fill = Estimate), colour = NA) +
-  scale_fill_viridis_c(option = "viridis", na.value = "grey80",
-                       guide = guide_colourbar(title = NULL)) +
-  labs(
-    title = "Municipality-Specific Rainfall Effects",
-    fill = ""
+estimates_map <- ggplot(data = shapefile_data) +
+  geom_sf(aes(fill = sign(Estimate) * sqrt(abs(Estimate))), colour = NA) +
+  scale_fill_gradient2(
+    low = "darkblue",      # Color for negative values
+    mid = "lightgrey",     # Neutral (zero) point
+    high = "darkred",      # Color for positive values
+    midpoint = 0,      # Zero is the neutral point
+    na.value = "white",
+    guide = guide_colorbar(title = "Estimate (sqrt)")
   ) +
+  labs(title = "State-Specific Rainfall Effects") +
   theme_minimal() +
   theme(
     axis.text = element_blank(),
@@ -699,53 +581,11 @@ estimates_map <- ggplot(data = merged_muni_data_slopes) +
   )
 estimates_map
 
-ggsave(here('output/estimates_map.jpg'), width = 7, height = 7)
-
-# Simplify the geometries (for computational efficiency)
-merged_muni_data_3y <- merged_muni_data_3y %>%
-  st_simplify(dTolerance = 0.01) 
-
-# Plot 3 year average rainfall deviation by municipality
-rainfall_map <- ggplot(data = merged_muni_data_3y) +
-  geom_sf(aes(fill = mean_rainfall_deviation), colour = NA) +
-  scale_fill_gradient2(
-    low = "darkblue",      # Color for negative values
-    mid = "lightgrey",     # Neutral (zero) point
-    high = "darkred",      # Color for positive values
-    midpoint = 0,      # Zero is the neutral point
-    na.value = "white",
-    guide = guide_colourbar(title = NULL)
-  ) +
-  facet_wrap(~month_name, ncol = 4) +
-  labs(
-    title = "Mean RFH Deviation (2022-2024)",
-    fill = ""
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text = element_blank(),
-    axis.title = element_blank(),
-    panel.grid = element_blank(),
-    strip.text = element_text(size = 10, face = "bold"),
-    legend.position = "bottom"
-  )
-
-# Plot two maps together
-ggarrange(rainfall_map, homicide_map_dep)
-ggsave(here('output/rainfall_homicide_maps_final.jpg'), width = 11, height = 7)
-
-# Plot three maps together
-ggarrange(
-  rainfall_map, homicide_map_dep,
-  estimates_map,
-  ncol = 2, nrow = 2,
-  widths = c(1, 1),
-  heights = c(1, 0.6)
-)
-ggsave(here('output/maps_final.jpg'), width = 10, height = 12)
-
-
-
-
-
+# Plot two graphs together
+ggarrange(rainfall_plot, homicide_plot,
+          estimates_map,
+          ncol = 2, nrow = 2,
+          widths = c(1, 1),
+          heights = c(1, 1.3))
+ggsave(here('output/mexico_final.jpg'), width = 10, height = 10)
 
