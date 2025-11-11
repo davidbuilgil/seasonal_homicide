@@ -21,7 +21,8 @@ rainfall <- read.csv(here("data/gainesville-replication/monthly_values_2011_2024
 rainfall <- rainfall %>%
   mutate(date = dmy(date),
          year = year(date),
-         month = month(date))
+         month = month(date)) %>%
+  filter(year != 2025)
 
 # Aggregate data monthly
 rainfall_month <- rainfall %>%
@@ -49,7 +50,7 @@ rainfall_plot <- ggplot(rainfall_month %>% filter(year >= 2003),
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Reference line at zero
   facet_wrap(~month_name, ncol = 4) +  # 12 facets (3 rows x 4 columns)
   labs(
-    title = "Deviation from Monthly Mean RFH by Year",
+    title = "Deviation from Monthly Mean Precipitation by Year",
     x = "",
     y = "Deviation"
   ) +
@@ -89,7 +90,8 @@ violence <- violence %>%
     date = mdy(date),
     year = year(date),
     month = month(date)
-  )
+  ) %>%
+  filter(year != 2025)
 
 # Aggregate data monthly
 violence_month <- violence %>%
