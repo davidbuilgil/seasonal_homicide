@@ -479,37 +479,14 @@ merged_muni_data_slopes <- merged_muni_data_3y %>%
   unique()
 
 # Plot regression estimates
-#estimates_map <- ggplot(data = merged_muni_data_slopes) +
-#  geom_sf(aes(fill = Estimate), colour = NA) +
-#  scale_fill_viridis_c(option = "viridis", na.value = "grey80",
-#                       guide = guide_colourbar(title = NULL)) +
-#  labs(
-#    title = "Municipality-Specific Rainfall Effects",
-#    fill = ""
-#  ) +
-#  theme_minimal() +
-#  theme(
-#    axis.text = element_blank(),
-#    axis.title = element_blank(),
-#    panel.grid = element_blank(),
-#    strip.text = element_text(size = 10, face = "bold"),
-#    legend.position = "bottom"
-#  )
-#estimates_map
-
-#ggsave(here('output/estimates_map.jpg'), width = 7, height = 7)
-
 estimates_map <- ggplot(data = merged_muni_data_slopes) +
-  geom_sf(aes(fill = sign(Estimate) * sqrt(abs(Estimate))), colour = NA) +
-  scale_fill_gradient2(
-    low = "darkblue",      # Color for negative values
-    mid = "lightgrey",     # Neutral (zero) point
-    high = "darkred",      # Color for positive values
-    midpoint = 0,      # Zero is the neutral point
-    na.value = "white",
-    guide = guide_colorbar(title = "Estimate (sqrt)")
+  geom_sf(aes(fill = Estimate), colour = NA) +
+  scale_fill_viridis_c(option = "viridis", na.value = "grey80",
+                       guide = guide_colourbar(title = NULL)) +
+  labs(
+    title = "Municipality-Specific Rainfall Effects",
+    fill = ""
   ) +
-  labs(title = "Municipality-Specific Rainfall Effects") +
   theme_minimal() +
   theme(
     axis.text = element_blank(),
@@ -520,13 +497,36 @@ estimates_map <- ggplot(data = merged_muni_data_slopes) +
   )
 estimates_map
 
+#ggsave(here('output/estimates_map.jpg'), width = 7, height = 7)
+
+#estimates_map <- ggplot(data = merged_muni_data_slopes) +
+#  geom_sf(aes(fill = sign(Estimate) * sqrt(abs(Estimate))), colour = NA) +
+#  scale_fill_gradient2(
+#    low = "darkblue",      # Color for negative values
+#    mid = "lightgrey",     # Neutral (zero) point
+#    high = "darkred",      # Color for positive values
+#    midpoint = 0,      # Zero is the neutral point
+#    na.value = "white",
+#    guide = guide_colorbar(title = "Estimate (sqrt)")
+#  ) +
+#  labs(title = "Municipality-Specific Rainfall Effects") +
+#  theme_minimal() +
+#  theme(
+#    axis.text = element_blank(),
+#    axis.title = element_blank(),
+#    panel.grid = element_blank(),
+#    strip.text = element_text(size = 10, face = "bold"),
+#    legend.position = "bottom"
+#  )
+#estimates_map
+
 # Plot two graphs together
 ggarrange(rainfall_plot, homicide_plot,
           estimates_map,
           ncol = 2, nrow = 2,
           widths = c(1, 1),
           heights = c(1, 1.3))
-ggsave(here('output/colombia_final.jpg'), width = 10, height = 10)
+ggsave(here('output/colombia_final_rev.jpg'), width = 10, height = 10)
 
 # Simplify the geometries (for computational efficiency)
 merged_muni_data_3y <- merged_muni_data_3y %>%
