@@ -28,7 +28,7 @@ rainfall <- rainfall %>%
 rainfall_month <- rainfall %>%
   mutate(month_name = factor(month.name[month], levels = month.name))
 
-# Calculate monthly mean and deviantion from monthly mean across years
+# Calculate monthly mean and deviation from monthly mean across years
 # Step 1: Calculate mean rfh for each month across years
 rainfall_monthly_mean <- rainfall_month %>%
   group_by(month) %>%
@@ -43,14 +43,14 @@ rainfall_month <- rainfall_month %>%
   )
 
 # Plot facets by month
-rainfall_plot <- ggplot(rainfall_month %>% filter(year >= 2003), 
+rainfall_plot <- ggplot(rainfall_month %>% filter(year >= 2011), 
                         aes(x = year, y = deviation)) +
   geom_line(color = "steelblue", alpha = 0.6) +  # Original data
   geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 1) +  # LOESS trend line
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Reference line at zero
   facet_wrap(~month_name, ncol = 4) +  # 12 facets (3 rows x 4 columns)
   labs(
-    title = "Deviation from Monthly Mean Precipitation by Year",
+    title = "(c) Deviation from Monthly Mean Rainfall by Year",
     x = "",
     y = "Deviation"
   ) +
@@ -129,7 +129,7 @@ violence_plot <- ggplot(violence_month, aes(x = year, y = deviation)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Reference line at zero
   facet_wrap(~month_name, ncol = 4) +  # 12 facets (3 rows x 4 columns)
   labs(
-    title = "Deviation from Monthly Mean Violence by Year",
+    title = "(d) Deviation from Monthly Mean Violence by Year",
     x = "",
     y = "Deviation"
   ) +
@@ -197,3 +197,136 @@ summary(gls_model_ar2)$tTable["scaled_rainfall_deviation", "Value"] + c(-2, 2) *
 summary(gls_model_ar3)$tTable["scaled_rainfall_deviation", "Value"]
 summary(gls_model_ar3)$tTable["scaled_rainfall_deviation", "Value"] + c(-2, 2) * summary(gls_model_ar3)$tTable["scaled_rainfall_deviation", "Std.Error"]
 
+# Density lines rain per periods
+periods <- list(
+  "1900-1980" = 1900:1980,
+  "1981–1985" = 1981:1985,
+  "1986–1990" = 1986:1990,  
+  "1991–1995" = 1991:1995,
+  "1996–2000" = 1996:2000,  
+  "2001–2005" = 2001:2005,
+  "2006–2010" = 2006:2010,
+  "2011–2015" = 2011:2015,
+  "2016–2020" = 2016:2020,
+  "2021–2024" = 2021:2024
+)
+
+# Compute monthly means per period
+period_means <- map_dfr(names(periods), function(p) {
+  rainfall_month %>%
+    filter(year %in% periods[[p]]) %>%
+    group_by(month) %>%
+    summarise(mean_rfh = mean(value, na.rm = TRUE), .groups = "drop") %>%
+    mutate(period = p)
+})
+
+# Order periods old -> new
+period_levels <- names(periods)
+period_means <- period_means %>%
+  mutate(period = factor(period, levels = period_levels))
+
+# Blue -> red colour gradient
+n_periods <- length(period_levels)
+period_cols <- colorRampPalette(c("navy", "blue", "skyblue", "orange", "red"))(n_periods)
+names(period_cols) <- period_levels
+
+# Density plot (weighted by mean rainfall)
+rain_period_means <- ggplot(period_means, aes(x = month, colour = period)) +
+  geom_density(
+    aes(weight = mean_rfh),
+    linewidth = 1,
+    adjust = 0.6,
+    alpha = 0.9,
+    key_glyph = "path"
+  ) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_colour_manual(values = period_cols) +
+  #coord_cartesian(ylim = c(0.025, 0.11)) +
+  labs(
+    title = "(a) Density of Monthly Rainfall Across Periods",
+    x = "",
+    y = "Density",
+    colour = ""
+  ) +
+  theme_minimal() +
+  theme(
+    legend.key = element_blank()
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        linetype = 1,
+        size = 1.2,
+        fill = NA
+      )
+    )
+  )
+
+# Density lines homicide per periods
+periods <- list(
+  "2011–2015" = 2011:2015,
+  "2016–2020" = 2016:2020,
+  "2021–2024" = 2021:2024
+)
+
+# Compute monthly means per period
+period_means <- map_dfr(names(periods), function(p) {
+  violence_month %>%
+    filter(year %in% periods[[p]]) %>%
+    group_by(month) %>%
+    summarise(mean_violence = mean(violence, na.rm = TRUE), .groups = "drop") %>%
+    mutate(period = p)
+})
+
+# Order periods old -> new
+period_levels <- names(periods)
+period_means <- period_means %>%
+  mutate(period = factor(period, levels = period_levels))
+
+# Blue -> red colour gradient
+n_periods <- length(period_levels)
+period_cols <- colorRampPalette(c("navy", "blue", "skyblue", "orange", "red"))(n_periods)
+names(period_cols) <- period_levels
+
+# Density plot (weighted by mean rainfall)
+violence_period_means <- ggplot(period_means, aes(x = month, colour = period)) +
+  geom_density(
+    aes(weight = mean_violence),
+    linewidth = 1,
+    adjust = 0.6,
+    alpha = 0.9,
+    key_glyph = "path"
+  ) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_colour_manual(values = period_cols) +
+  coord_cartesian(ylim = c(0.05, 0.09)) +
+  labs(
+    title = "(b) Density of Monthly Violence Across Periods",
+    x = "",
+    y = "Density",
+    colour = ""
+  ) +
+  theme_minimal() +
+  theme(
+    legend.key = element_blank()
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        linetype = 1,
+        size = 1.2,
+        fill = NA
+      )
+    )
+  )
+
+# Plot five plots together
+ggarrange(
+  rain_period_means, violence_period_means,
+  rainfall_plot, violence_plot,
+  ncol = 2, nrow = 2,
+  widths = c(1, 1),
+  heights = c(0.7, 1)
+)
+
+ggsave(here('output/gainesville_final_4.jpg'), width = 10, height = 7)
