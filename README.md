@@ -2,7 +2,6 @@
 
 This repository contains the code and data to reproduce the analyses in:
 
-**Buil-Gil, D., Oliveira, T.R., & Maldonado-Guzmán, D.J.**  
 *Climate Change and Crime: Shifts in Seasonal Violence Patterns* (manuscript under review).
 
 ## Repository structure
