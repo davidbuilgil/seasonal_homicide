@@ -38,7 +38,7 @@ The raw datasets are public and can be downloaded from the following sources (ac
   https://data.cityofgainesville.org/Public-Safety/Crime-Responses/gvua-xt9q/about_data
 - Rainfall (Florida State University Climate Center):  
   https://climatecenter.fsu.edu/products-services/data/precipitation/gainesville
-- Temperature (World Bank Climate Change Knowledge Portal; Florida):  
+- Temperature (World Bank Climate Change Knowledge Portal; CMIP6-based):  
   https://climateknowledgeportal.worldbank.org/download-data
 
 ### Where to save downloaded data
