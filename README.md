@@ -1,8 +1,8 @@
-# Climate Change and Crime: Shifts in Seasonal Violence Patterns — Replication Materials
+# Climate change and the shifting seasonality of violence — Replication Materials
 
 This repository contains the code and data to reproduce the analyses in:
 
-*Climate Change and Crime: Shifts in Seasonal Violence Patterns* (manuscript under review).
+*Climate change and the shifting seasonality of violence* (manuscript under review).
 
 ## Repository structure
 
