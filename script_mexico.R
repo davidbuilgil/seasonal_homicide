@@ -10,6 +10,7 @@ library(nlme)
 library(sf)
 library(spdep)
 library(stringr)
+library(purrr)
 library(ggpubr)
 library(lubridate)
 library(tidyr)
@@ -60,7 +61,7 @@ rainfall_plot <- ggplot(rainfall_month %>% filter(year >= 1997),
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Reference line at zero
   facet_wrap(~month_name, ncol = 4) +  # 12 facets (3 rows x 4 columns)
   labs(
-    title = "(a) Deviation from Monthly Mean Rainfall by Year",
+    title = "(c) Deviation from Monthly Mean Rainfall by Year",
     x = "",
     y = "Deviation"
   ) +
@@ -168,7 +169,7 @@ homicide_plot <- ggplot(homicide_month, aes(x = year, y = deviation)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Reference line at zero
   facet_wrap(~month_name, ncol = 4) +  # 12 facets (3 rows x 4 columns)
   labs(
-    title = "(b) Deviation from Monthly Mean Homicide by Year",
+    title = "(d) Deviation from Monthly Mean Homicide by Year",
     x = "",
     y = "Deviation"
   ) +
